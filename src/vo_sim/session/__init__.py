@@ -1,0 +1,1 @@
+"""Session module - state management and persistence."""

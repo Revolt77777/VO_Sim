@@ -1,0 +1,32 @@
+# Build system configuration
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Ruff: Fast Python linter and formatter
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# MyPy: Static type checker
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+disallow_untyped_defs = true
+strict_equality = true
+
+# Pytest: Test runner
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = ["--verbose", "--cov=vo_sim", "--cov-report=term-missing"]
+
+# Coverage: Code coverage measurement
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]

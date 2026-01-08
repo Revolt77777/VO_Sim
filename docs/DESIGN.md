@@ -577,12 +577,12 @@ def replay_session(session_id: str) -> SessionState:
 
 ### Command Reference
 
-#### `interviewsim start`
+#### `vo-sim start`
 
 Creates new interview session.
 
 ```bash
-$ interviewsim start
+$ vo-sim start
 ```
 
 **Output** (using Rich formatting):
@@ -605,19 +605,19 @@ Your class must implement:
 [Full problem description...]
 
 When ready, submit your solution:
-  interviewsim submit --file your_solution.py
+  vo-sim submit --file your_solution.py
 ```
 
 **State Change**: `IDLE` → `PROBLEM_PRESENTED`
 
 ---
 
-#### `interviewsim submit --file <path>`
+#### `vo-sim submit --file <path>`
 
 Submit code for evaluation.
 
 ```bash
-$ interviewsim submit --file lru_cache.py
+$ vo-sim submit --file lru_cache.py
 ```
 
 **Output**:
@@ -644,19 +644,19 @@ Your solution has issues with eviction logic. When the cache
 reaches capacity, it should remove the least recently used item.
 Currently, it's removing items in the wrong order.
 
-Try again or type 'interviewsim hint' for guidance.
+Try again or type 'vo-sim hint' for guidance.
 ```
 
 **State Change**: `AWAITING_ACTION` → `EVALUATING` → `AWAITING_ACTION`
 
 ---
 
-#### `interviewsim hint`
+#### `vo-sim hint`
 
 Request adaptive hint.
 
 ```bash
-$ interviewsim hint
+$ vo-sim hint
 ```
 
 **Output** (Level 1):
@@ -674,12 +674,12 @@ Think about how you might combine two data structures...
 
 ---
 
-#### `interviewsim status`
+#### `vo-sim status`
 
 Show current session status.
 
 ```bash
-$ interviewsim status
+$ vo-sim status
 ```
 
 **Output**:
@@ -703,12 +703,12 @@ $ interviewsim status
 
 ---
 
-#### `interviewsim end`
+#### `vo-sim end`
 
 End session and show summary.
 
 ```bash
-$ interviewsim end
+$ vo-sim end
 ```
 
 **Output**:
@@ -744,31 +744,31 @@ $ interviewsim end
 #### No Active Session
 
 ```bash
-$ interviewsim submit --file lru_cache.py
+$ vo-sim submit --file lru_cache.py
 ❌ Error: No active interview session.
-Start a new session with: interviewsim start
+Start a new session with: vo-sim start
 ```
 
 #### Session Already Active
 
 ```bash
-$ interviewsim start
+$ vo-sim start
 ❌ Error: Session already in progress (550e8400-...).
-Use 'interviewsim end' to finish current session first.
+Use 'vo-sim end' to finish current session first.
 ```
 
 #### Invalid State Transition
 
 ```bash
-$ interviewsim hint
+$ vo-sim hint
 ❌ Error: Cannot request hint in current state.
-Submit code first with: interviewsim submit --file <path>
+Submit code first with: vo-sim submit --file <path>
 ```
 
 #### File Not Found
 
 ```bash
-$ interviewsim submit --file missing.py
+$ vo-sim submit --file missing.py
 ❌ Error: File not found: missing.py
 ```
 

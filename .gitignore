@@ -17,6 +17,7 @@ venv/
 env/
 ENV/
 .venv
+*.egg-info/
 
 # Distribution / packaging
 build/

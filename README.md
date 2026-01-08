@@ -19,23 +19,45 @@ This project showcases:
 
 ---
 
+## Installation
+
+**Quick Install (3 commands):**
+
+```bash
+# 1. Create & activate virtual environment
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Mac/Linux
+
+# 2. Install VO_Sim with dev tools
+pip install -e ".[dev]"
+
+# 3. Verify
+vo-sim --version
+pytest
+```
+
+See [README_SETUP.md](SETUP.md) for file explanations.
+
+---
+
 ## Quick Start
 
 ```bash
 # Start an interview session
-interviewsim start
+vo-sim start
 
 # Submit your solution
-interviewsim submit --file lru_cache.py
+vo-sim submit --file lru_cache.py
 
 # Get adaptive hints
-interviewsim hint
+vo-sim hint
 
 # Check status
-interviewsim status
+vo-sim status
 
 # End session
-interviewsim end
+vo-sim end
 ```
 
 ---
@@ -115,7 +137,7 @@ class LRUCache:
 ## Example Session
 
 ```bash
-$ interviewsim start
+$ vo-sim start
 ╭─────────────────────────────────────────────────────────╮
 │  🎯 LRU Cache Interview Session Started                │
 │  Session ID: 550e8400-e29b-41d4-a716-446655440000      │
@@ -124,7 +146,7 @@ $ interviewsim start
 Problem: Implement an LRU (Least Recently Used) Cache
 [Problem description...]
 
-$ interviewsim submit --file my_solution.py
+$ vo-sim submit --file my_solution.py
 🧪 Running evaluation...
 
 ╭─────────────── Evaluation Result ───────────────╮
@@ -135,14 +157,14 @@ $ interviewsim submit --file my_solution.py
 
 💬 Feedback: Your eviction logic has an issue...
 
-$ interviewsim hint
+$ vo-sim hint
 💡 Hint (Level 1):
 What data structure maintains insertion order in Python?
 
-$ interviewsim submit --file my_solution_v2.py
+$ vo-sim submit --file my_solution_v2.py
 ✅ All tests passed! (12/12)
 
-$ interviewsim end
+$ vo-sim end
 ╭──────────── Interview Summary ─────────────╮
 │ Outcome: Success! 🎉                       │
 │ Attempts: 2                                │
