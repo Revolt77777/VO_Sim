@@ -16,7 +16,31 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from vo_sim.schemas import EventType, SessionState
+from vo_sim.session.manager import (
+    NoActiveSessionError,
+    SessionAlreadyActiveError,
+    SessionManager,
+)
+
 console = Console()
+
+# Global session manager instance
+_session_manager: SessionManager | None = None
+
+
+def get_manager() -> SessionManager:
+    """Get or create the global session manager."""
+    global _session_manager
+    if _session_manager is None:
+        _session_manager = SessionManager()
+    return _session_manager
+
+
+def error(message: str) -> None:
+    """Display error message and exit."""
+    console.print(f"[bold red]❌ Error:[/bold red] {message}\n", style="red")
+    sys.exit(1)
 
 
 @click.group()
@@ -32,14 +56,21 @@ def cli() -> None:
 @cli.command()
 def start() -> None:
     """Start a new interview session."""
-    # TODO: Create session via SessionManager
-    # TODO: Emit SESSION_STARTED event
-    # TODO: Transition state: IDLE -> PROBLEM_PRESENTED
+    manager = get_manager()
+
+    try:
+        session_id = manager.create_session()
+    except SessionAlreadyActiveError as e:
+        error(
+            f"Session already in progress ({manager.get_active_session_id()[:8]}...).\n"
+            "Use 'vo-sim end' to finish current session first."
+        )
+        return
 
     console.print(
         Panel.fit(
             "[bold cyan]🎯 LRU Cache Interview Session Started[/bold cyan]\n"
-            "Session ID: [dim]550e8400-e29b-41d4-a716-446655440000[/dim]",
+            f"Session ID: [dim]{session_id}[/dim]",
             border_style="cyan",
         )
     )
@@ -69,16 +100,48 @@ def start() -> None:
 )
 def submit(file_path: str) -> None:
     """Submit code for evaluation."""
-    # TODO: Check session state (must be PROBLEM_PRESENTED or AWAITING_ACTION)
-    # TODO: Load and validate user code
-    # TODO: Run evaluator
-    # TODO: Classify failure
-    # TODO: Emit CODE_SUBMITTED and EVAL_RESULT events
-    # TODO: Run agent to generate feedback
-    # TODO: Transition state: AWAITING_ACTION -> EVALUATING -> AWAITING_ACTION
+    manager = get_manager()
+
+    # Check if session exists
+    try:
+        state = manager.get_current_state()
+    except NoActiveSessionError:
+        error("No active interview session.\nStart a new session with: vo-sim start")
+        return
+
+    # Check if submission is allowed in current state
+    state_machine = manager.get_state_machine()
+    if not state_machine.can_submit_code():
+        error(
+            f"Cannot submit code in current state: {state.value}\n"
+            "Wait for evaluation to complete."
+        )
+        return
 
     console.print(f"📥 Submitting code from: [cyan]{file_path}[/cyan]")
     console.print("🧪 Running evaluation...\n")
+
+    # Transition to EVALUATING
+    manager.transition_to(SessionState.EVALUATING)
+
+    # Emit CODE_SUBMITTED event
+    manager.emit_event(
+        EventType.CODE_SUBMITTED,
+        {
+            "attempt_number": len(
+                [
+                    e
+                    for e in manager.get_session_events()
+                    if e.event_type == EventType.CODE_SUBMITTED
+                ]
+            )
+            + 1,
+            "file_path": file_path,
+        },
+    )
+
+    # TODO: Actually run evaluator here
+    # For now, show mock results and transition back
 
     # Mock result display
     table = Table(title="Evaluation Result", border_style="red")
@@ -98,6 +161,20 @@ def submit(file_path: str) -> None:
     console.print("  • test_eviction_order_complex")
     console.print("  • test_capacity_one")
 
+    # Emit EVAL_RESULT event
+    manager.emit_event(
+        EventType.EVAL_RESULT,
+        {
+            "passed": False,
+            "failure_type": "WRONG_ANSWER",
+            "tests_passed": 5,
+            "tests_failed": 7,
+        },
+    )
+
+    # Transition to AWAITING_ACTION
+    manager.transition_to(SessionState.AWAITING_ACTION)
+
     console.print(
         "\n💬 [bold]Feedback:[/bold]\n"
         "Your solution has issues with eviction logic. When the cache\n"
@@ -112,11 +189,29 @@ def submit(file_path: str) -> None:
 @cli.command()
 def hint() -> None:
     """Request a hint for the current problem."""
-    # TODO: Check session state (must be AWAITING_ACTION)
-    # TODO: Get agent context (attempts, failure history)
-    # TODO: Run hint policy to determine level
+    manager = get_manager()
+
+    # Check if session exists
+    try:
+        state = manager.get_current_state()
+    except NoActiveSessionError:
+        error("No active interview session.\nStart a new session with: vo-sim start")
+        return
+
+    # Check if hint is allowed in current state
+    state_machine = manager.get_state_machine()
+    if not state_machine.can_request_hint():
+        error(
+            f"Cannot request hint in current state: {state.value}\n"
+            "Submit code first with: vo-sim submit --file <path>"
+        )
+        return
+
+    # Emit HINT_REQUESTED event
+    manager.emit_event(EventType.HINT_REQUESTED, {})
+
+    # TODO: Use hint policy to determine level
     # TODO: Generate hint via LLM
-    # TODO: Emit HINT_REQUESTED and HINT_GIVEN events
 
     console.print(
         Panel.fit(
@@ -127,30 +222,52 @@ def hint() -> None:
             border_style="yellow",
         )
     )
+
+    # Emit HINT_GIVEN event
+    manager.emit_event(
+        EventType.HINT_GIVEN,
+        {"hint_level": 1, "trigger_reason": "user_request"},
+    )
+
     console.print()
 
 
 @cli.command()
 def status() -> None:
     """Show current session status."""
-    # TODO: Load current session
-    # TODO: Get session state and statistics
-    # TODO: Display summary
+    manager = get_manager()
+
+    # Check if session exists
+    try:
+        session_id = manager.get_active_session_id()
+        state = manager.get_current_state()
+        events = manager.get_session_events()
+    except NoActiveSessionError:
+        error("No active interview session.\nStart a new session with: vo-sim start")
+        return
+
+    # Count events
+    submission_count = len(
+        [e for e in events if e.event_type == EventType.CODE_SUBMITTED]
+    )
+    hint_count = len([e for e in events if e.event_type == EventType.HINT_GIVEN])
+
+    # Get session start time
+    start_event = events[0]
+    start_time = start_event.timestamp
 
     table = Table(title="Session Status", border_style="blue", show_header=False)
     table.add_column("Key", style="cyan")
     table.add_column("Value", style="yellow")
 
-    table.add_row("Session ID", "550e8400-...")
+    table.add_row("Session ID", f"{session_id[:8]}...")
     table.add_row("Problem", "LRU Cache")
-    table.add_row("Started", "2026-01-06 12:00:00")
-    table.add_row("Duration", "15m 32s")
+    table.add_row("Started", start_time.strftime("%Y-%m-%d %H:%M:%S"))
+    table.add_row("Current State", state.value)
     table.add_row("", "")
-    table.add_row("Attempts", "3")
-    table.add_row("Last Result", "❌ 5/12 tests passed")
-    table.add_row("Hints Used", "1 (Level 1)")
-    table.add_row("", "")
-    table.add_row("Status", "Awaiting next submission or hint")
+    table.add_row("Attempts", str(submission_count))
+    table.add_row("Hints Used", str(hint_count))
+    table.add_row("Total Events", str(len(events)))
 
     console.print(table)
     console.print()
@@ -159,34 +276,47 @@ def status() -> None:
 @cli.command()
 def end() -> None:
     """End the current interview session."""
-    # TODO: Check session exists
-    # TODO: Generate session summary
-    # TODO: Emit SESSION_ENDED event
-    # TODO: Transition state: * -> DONE
+    manager = get_manager()
+
+    # Check if session exists
+    try:
+        session_id = manager.get_active_session_id()
+        events = manager.get_session_events()
+    except NoActiveSessionError:
+        error("No active interview session.\nStart a new session with: vo-sim start")
+        return
+
+    # Calculate stats
+    submission_count = len(
+        [e for e in events if e.event_type == EventType.CODE_SUBMITTED]
+    )
+    hint_count = len([e for e in events if e.event_type == EventType.HINT_GIVEN])
+
+    # Get session duration
+    start_event = events[0]
+    from datetime import datetime
+
+    duration = datetime.utcnow() - start_event.timestamp
+    duration_str = f"{int(duration.total_seconds() // 60)}m {int(duration.total_seconds() % 60)}s"
+
+    # End the session
+    manager.end_session()
 
     console.print(
         Panel.fit(
             "[bold green]Interview Summary[/bold green]\n\n"
-            "[cyan]Session ID:[/cyan] 550e8400-...\n"
+            f"[cyan]Session ID:[/cyan] {session_id[:8]}...\n"
             "[cyan]Problem:[/cyan] LRU Cache\n"
-            "[cyan]Duration:[/cyan] 24m 15s\n\n"
-            "[cyan]Total Attempts:[/cyan] 4\n"
-            "[cyan]Final Result:[/cyan] ✅ 12/12 tests passed\n"
-            "[cyan]Hints Used:[/cyan] 2 (Levels 1, 2)\n\n"
-            "[cyan]Outcome:[/cyan] Success! 🎉\n\n"
+            f"[cyan]Duration:[/cyan] {duration_str}\n\n"
+            f"[cyan]Total Attempts:[/cyan] {submission_count}\n"
+            f"[cyan]Hints Used:[/cyan] {hint_count}\n\n"
+            "[cyan]Outcome:[/cyan] Session ended\n\n"
             "[dim]Session log saved to:\n"
-            "~/.vo_sim/sessions/550e8400-....jsonl[/dim]",
+            f"~/.vo_sim/sessions/{session_id}.jsonl[/dim]",
             border_style="green",
         )
     )
     console.print()
-
-
-# Error handling helper
-def error(message: str) -> None:
-    """Display error message and exit."""
-    console.print(f"[bold red]❌ Error:[/bold red] {message}\n", style="red")
-    sys.exit(1)
 
 
 if __name__ == "__main__":

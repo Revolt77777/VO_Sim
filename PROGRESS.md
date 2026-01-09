@@ -101,24 +101,140 @@ vo-sim end
 
 ---
 
+## ✅ Phase 3: State Machine (DONE!)
+
+### What We Built
+
+**State machine with full validation:**
+```python
+sm = SessionStateMachine()
+sm.transition_to(SessionState.PROBLEM_PRESENTED)  # ✅ Valid
+sm.transition_to(SessionState.EVALUATING)         # ❌ Error - invalid!
+```
+
+**Features:**
+- ✅ 5 states: IDLE → PROBLEM_PRESENTED → EVALUATING → AWAITING_ACTION → DONE
+- ✅ Validates all transitions
+- ✅ Helper methods: `can_submit_code()`, `can_request_hint()`, `is_done()`
+- ✅ Custom exception: `InvalidTransitionError`
+- ✅ 20+ comprehensive tests
+
+**Try it:**
+```python
+from vo_sim.session.state_machine import SessionStateMachine
+from vo_sim.schemas import SessionState
+
+sm = SessionStateMachine()
+print(sm.current_state)  # IDLE
+sm.transition_to(SessionState.PROBLEM_PRESENTED)
+print(sm.can_submit_code())  # True
+```
+
+---
+
+## ✅ Phase 4: Storage (DONE!)
+
+### What We Built
+
+**Event persistence with JSONL:**
+```python
+store = EventStore()
+store.append_event(event)
+events = store.load_events("session-id")
+```
+
+**Features:**
+- ✅ Save events to `~/.vo_sim/sessions/{session_id}.jsonl`
+- ✅ Append-only (never modify history)
+- ✅ Load events in chronological order
+- ✅ Helper methods: `session_exists()`, `get_all_session_ids()`, etc.
+- ✅ 20+ comprehensive tests
+
+**Try it:**
+```python
+from vo_sim.session.storage import EventStore
+from vo_sim.schemas import Event, EventType
+
+store = EventStore()
+event = Event(session_id="test", event_type=EventType.SESSION_STARTED, payload={})
+store.append_event(event)
+print(store.load_events("test"))  # [Event(...)]
+```
+
+---
+
+## ✅ Phase 5: Session Manager (DONE!)
+
+### What We Built
+
+**Session coordination layer:**
+```python
+manager = SessionManager()
+session_id = manager.create_session()  # Creates session + state machine + storage
+manager.get_current_state()            # SessionState.PROBLEM_PRESENTED
+manager.emit_event(EventType.CODE_SUBMITTED, {...})
+manager.end_session()
+```
+
+**Features:**
+- ✅ Manages session lifecycle (create, end, track active)
+- ✅ Combines state machine + event storage
+- ✅ Generates UUIDs for new sessions
+- ✅ Persists active session to file (survives restarts)
+- ✅ Emits events for all actions
+- ✅ Custom exceptions: `NoActiveSessionError`, `SessionAlreadyActiveError`
+- ✅ 20+ comprehensive tests
+
+**Try it:**
+```python
+from vo_sim.session.manager import SessionManager
+
+manager = SessionManager()
+session_id = manager.create_session()
+print(manager.has_active_session())  # True
+print(manager.get_current_state())   # SessionState.PROBLEM_PRESENTED
+```
+
+---
+
+## ✅ Phase 6: Connected CLI (DONE!)
+
+### What We Built
+
+**CLI now uses real session logic:**
+- ✅ All commands check for active session
+- ✅ State validation before actions
+- ✅ Real session IDs (UUIDs)
+- ✅ Events saved to `~/.vo_sim/sessions/`
+- ✅ Real statistics (attempt count, hints, duration)
+- ✅ Error messages for invalid operations
+
+**Try the full flow:**
+```bash
+vo-sim start                    # Creates session
+vo-sim submit --file test.py    # Requires active session
+vo-sim hint                     # Only works after submission
+vo-sim status                   # Shows real session data
+vo-sim end                      # Persists events
+```
+
+**Features:**
+- Sessions persist across CLI invocations
+- State machine validates transitions
+- Events logged to JSONL files
+- Beautiful error messages with guidance
+
+---
+
 ## 📋 What's Next
 
-**Option 1: Build State Machine** (Core logic)
-- Create `session/state_machine.py`
-- Implement state transitions
-- Use `SessionState` enum
+**Build Evaluator** (The missing piece!)
+- Create `grading/runner.py` - Execute user code safely
+- Create `grading/test_suite.py` - 12 LRU Cache tests
+- Create `grading/classifier.py` - Classify failures
+- Connect to CLI `submit` command
 
-**Option 2: Build Storage** (Persistence)
-- Create `session/storage.py`
-- Save/load `Event` objects to JSONL
-- Test event replay
-
-**Option 3: Build Evaluator** (Test runner)
-- Create `grading/runner.py`
-- Implement LRU test suite
-- Classify failures
-
-**Recommendation:** State machine next (it's the core logic!)
+**After evaluator, we have a working v1!**
 
 ---
 
